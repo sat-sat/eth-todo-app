@@ -12,43 +12,42 @@ App = {
 
   // https://medium.com/metamask/https-medium-com-metamask-breaking-change-injecting-web3-7722797916a8
   loadWeb3: async () => {
-    /**
-     * The code below is slightly different from the above reference
-     * to the medium article that provides an example of how to create
-     * a new instance of the Web3 constructor. Since MetaMask changed
-     * its API slightly since the publishing of the above article,
-     * the below code is a stripped down version of what's actually
-     * necessary to support the new way of instantiating the Web3 constructor.
-     */
+    // Modern dapp browsers...
     if (window.ethereum) {
-      window.web3 = new Web3(ethereum)
-      App.web3Provider = window.web3.currentProvider
+      window.web3 = new Web3(ethereum);
+      App.web3Provider = window.web3.currentProvider;
       try {
         // Request account access if needed
-        await window.ethereum.request('eth_requestAccounts')
+        await window.ethereum.enable();
         // Acccounts now exposed
-        web3.eth.sendTransaction({/* ... */})
+        web3.eth.sendTransaction({/* ... */});
       } catch (error) {
         // User denied account access...
       }
     }
+    // Legacy dapp browsers...
+    else if (window.web3) {
+      window.web3 = new Web3(web3.currentProvider);
+      // Acccounts always exposed
+      web3.eth.sendTransaction({/* ... */});
+    }
     // Non-dapp browsers...
     else {
-      console.log('Non-Ethereum browser detected. You should consider trying MetaMask!')
+      console.log('Non-Ethereum browser detected. You should consider trying MetaMask!');
     }
   },
 
   loadAccount: async () => {
-    const accounts = web3.eth.accounts;
-    const firstAccount = accounts[0]
+    const selectedAddress = web3.currentProvider.selectedAddress;
 
-    if (!firstAccount) {
+    if (!selectedAddress) {
       setTimeout(() => {
         return App.loadAccount();
       }, 200);
+    } else {
+      App.account = selectedAddress;
+      web3.eth.defaultAccount = selectedAddress
     }
-    
-    App.account = firstAccount;
   },
 
   loadContracts: async () => {
@@ -75,13 +74,23 @@ App = {
     }
   },
 
+  createTask: async () => {
+    App.setLoading(true);
+    const content = $('#newTask').val();
+    await App.todoList.createTask(content);
+    window.location.reload();
+  },
+
   renderTasks: async () => {
     // Load the total task count form the blockchain
-    const _taskCount = await App.todoList.taskCount();
-    const taskCount = _taskCount.c;
+    const taskCount = await App.todoList.taskCount()
     const $taskTemplate = $('.taskTemplate');
 
-    taskCount.forEach(async (i) => {
+    // Clear out the task list and re-append all tasks
+    $('#completedTaskList').empty()
+    $('#taskList').empty()
+
+    for (let i = 1; i <= taskCount; i++) {
       const task = await App.todoList.tasks(i);
       const taskId = task[0].toNumber();
       const taskContent = task[1];
@@ -94,10 +103,6 @@ App = {
                       .prop('checked', taskCompleted)
                       // .on('click', App.toggleCompleted)
 
-      // Clear out the task list and re-append all tasks
-      $('#completedTaskList').empty()
-      $('#taskList').empty()
-
       if (taskCompleted) {
         $('#completedTaskList').append($newTaskTemplate);
       } else {
@@ -106,7 +111,7 @@ App = {
 
       // Show the task
       $newTaskTemplate.show();
-    })
+    }
 
     // Render out each task with a new task template
   },
@@ -115,7 +120,6 @@ App = {
     // Recursive function to continue render attempt
     // until polling for this account is available
     if (!App.account) {
-      console.log('here -------------')
       setTimeout(() => {
         return App.render();
       }, 200);
