@@ -88,6 +88,13 @@ App = {
     window.location.reload();
   },
 
+  deleteTask: async (e) => {
+    App.setLoading(true);
+    const taskId = e.target.name;
+    await App.todoList.deleteTask(taskId);
+    window.location.reload();
+  },
+
   renderTasks: async () => {
     // Load the total task count form the blockchain
     const taskCount = await App.todoList.taskCount()
@@ -102,6 +109,9 @@ App = {
       const taskId = task[0].toNumber();
       const taskContent = task[1];
       const taskCompleted = task[2];
+      const taskDeleted = task[3];
+
+      if (taskDeleted) return;
       
       const $newTaskTemplate = $taskTemplate.clone();
       $newTaskTemplate.find('.content').html(taskContent);
@@ -109,6 +119,9 @@ App = {
                       .prop('name', taskId)
                       .prop('checked', taskCompleted)
                       .on('click', App.toggleCompleted)
+      $newTaskTemplate.find('button')
+                      .prop('name', taskId)
+                      .on('click', App.deleteTask);
 
       if (taskCompleted) {
         $('#completedTaskList').append($newTaskTemplate);
